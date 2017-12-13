@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>DECIBEL</title>
+    <meta charset="utf-8" />
+	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+</head>
+<body style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px;">
+
+<img src="deloitte-logo-print.png" class="logo_deloitte" alt="Deloitte" style="z-index:999;">
+<img src="Decibel.png" class="logo_decibel" alt="Decibel" height="60px" Width="180px" style="z-index:999;">
+<h2 class="head1"> Voice Enabled </h2>
+<h2 class="head2"> Cognitive  </h2>
+<h2 class="head3"> Platform  </h2>
+
+<img src="mic.png" id="speakAgainsmall" class="sabutton" hidden="" title="Click to speak again">
+<img src="bgfinal.png" class="bg_img" alt="background">
+<div class="speak-home">
+<button id="startBtn" class="stbutton" disabled="disabled" hidden="">Start</button>
+<button id="stopBtn" class="spbutton" disabled="disabled" hidden="">Stop</button>
+<center><img src="mic.png" id="speakAgainbig" alt="Mic" class="mic" title="Click to speak again"> </center>
+</div>
+
+<div style="float: center;margin-top: 90px;margin-left: 40px;">
+    <table width="100%">
+        <tr>            
+            <td ><input  type="hidden" id="key" type="text" size="40" value="da516ce671ae4a9da60cb67eac9c14e7" v></td>
+        </tr>
+     
+        <tr>
+            <td></td>
+            <td>
+                <button id="startBtn" disabled="disabled" hidden="">Start</button>
+                <button id="stopBtn" disabled="disabled" hidden="">Stop</button>
+							
+            </td>
+        </tr>
+    </table>
+</div>
+<div id="vizContainer" style="width:1000px; height:350px; margin-top: 15px;margin-left: 21px;">
+</div>
+<div>
+    <div id="toggle-first-sidebar" style="text-align: right;position: absolute;width: 100%;right: 18px;top: 200px;cursor: pointer;">
+        <img src="plus.png" width="30px" height="30px">
+        <div class="first-sidebar-content" style="display: none; min-width: 200px">
+        <div style="min-width: 300px;float: right;background-color: #fff;text-align: center;">
+            
+            <div><td>Recognized voice: <span id="hypothesisDiv"></span></td></div>
+			<br>
+			<br>
+			<br>
+			<br>
+            </div>
+        </div>
+    </div>
+    <div id="toggle-second-sidebar" style="text-align: right;position: absolute;width: 100%;right: 18px;top: 400px;cursor: pointer;">
+        <img src="plus.png" width="30px" height="30px">
+        <div class="second-sidebar-content" style="display: none; min-width: 200px"">			
+            <div>  <td>Status: <span id="statusDiv"></span></td></div>
+            <br>
+			<br>
+            </div>
+        </div>
+    </div>
+</div>
+
+  
+    <script src="scripts/require.min.js"></script>
+    <script src="scripts/jquery.min.js"></script>
+   
+
+    <!-- SDK REFERENCE -->
+    <script src="scripts/speech.browser.sdk-min.js"></script>
+
+    <!-- SDK USAGE -->
+    <script>
+        // On doument load resolve the SDK dependecy
+        function Initialize(onComplete) {
+            require(["Speech.Browser.Sdk"], function(SDK) {
+                onComplete(SDK);
+            });
+        }
+        
+        // Setup the recongizer
+        function RecognizerSetup(SDK, recognitionMode, subscriptionKey) {
+            var recognizerConfig = new SDK.RecognizerConfig(
+                new SDK.SpeechConfig(
+                    new SDK.Context(
+                        new SDK.OS(navigator.userAgent, "Browser", null),
+                        new SDK.Device("SpeechSample", "SpeechSample", "1.0.00000"))),
+                recognitionMode
+                ); 
+
+           
+            var authentication = new SDK.CognitiveSubscriptionKeyAuthentication(subscriptionKey);
+
+            return SDK.CreateRecognizer(recognizerConfig, authentication);
+        }
+
+        // Start the recognition
+        function RecognizerStart(SDK, recognizer) {
+            recognizer.Recognize((event) => {
+                /*
+                 Alternative syntax for typescript devs.
+                 if (event instanceof SDK.RecognitionTriggeredEvent)
+                */
+                switch (event.Name) {
+                    case "RecognitionTriggeredEvent" :
+                        UpdateStatus("Initializing");
+                        break;
+                    case "ListeningStartedEvent" :
+                        UpdateStatus("Listening");
+                        break;
+                    case "RecognitionStartedEvent" :
+                        UpdateStatus("Listening_Recognizing");
+                        break;
+                    case "SpeechStartDetectedEvent" :
+                        UpdateStatus("Listening_DetectedSpeech_Recognizing");
+                        console.log(JSON.stringify(event.Result)); // check console for other information in result
+                        break;
+                    case "SpeechHypothesisEvent" :
+                        UpdateRecognizedHypothesis(event.Result.Text);
+                        console.log(JSON.stringify(event.Result)); // check console for other information in result
+                        break;
+                    case "SpeechEndDetectedEvent" :
+                        OnSpeechEndDetected();
+                        UpdateStatus("Processing_Adding_Final_Touches");
+                        console.log(JSON.stringify(event.Result)); // check console for other information in result
+                        break;
+                    case "SpeechSimplePhraseEvent" :
+                        UpdateRecognizedPhrase(JSON.stringify(event.Result, null, 3));
+                        break;
+                    case "SpeechDetailedPhraseEvent" :
+                        UpdateRecognizedPhrase(JSON.stringify(event.Result, null, 3));
+                        break;
+                    case "RecognitionEndedEvent" :
+                        OnComplete();
+                        UpdateStatus("Idle");
+                        console.log(JSON.stringify(event)); // Debug information
+                        break;
+                }
+            })
+            .On(() => {
+                // The request succeeded. Nothing to do here.
+            },
+            (error) => {
+                console.error(error);
+            });
+        }
+
+        // Stop the Recognition.
+        function RecognizerStop(SDK, recognizer) {
+            // recognizer.AudioSource.Detach(audioNodeId) can be also used here. (audioNodeId is part of ListeningStartedEvent)
+            recognizer.AudioSource.TurnOff();
+        }
+    </script>
+
+    <!-- Browser Hooks -->
+    <script>
+        var startBtn, stopBtn, hypothesisDiv, statusDiv, key, languageOptions, formatOptions;
+        var SDK;
+        var recognizer;
+        var previousSubscriptionKey;
+        var input;
+        var voices = speechSynthesis.getVoices();
+        document.addEventListener("DOMContentLoaded", function () {
+            createBtn = document.getElementById("createBtn");
+            startBtn = document.getElementById("startBtn");
+            stopBtn = document.getElementById("stopBtn");
+           // phraseDiv = document.getElementById("phraseDiv");
+            hypothesisDiv = document.getElementById("hypothesisDiv");
+            statusDiv = document.getElementById("statusDiv");
+            key = document.getElementById("key");
+         
+
+            startBtn.addEventListener("click", function () {
+                if (!recognizer || previousSubscriptionKey != key.value) {
+                    previousSubscriptionKey = key.value;
+                    Setup();
+                }
+
+                hypothesisDiv.innerHTML = "";
+                //phraseDiv.innerHTML = "";
+                RecognizerStart(SDK, recognizer);
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            });
+			
+			speakAgainsmall.addEventListener("click", function () {
+                if (!recognizer || previousSubscriptionKey != key.value) {
+                    previousSubscriptionKey = key.value;
+                    Setup();
+                }
+
+                hypothesisDiv.innerHTML = "";
+                //phraseDiv.innerHTML = "";
+                RecognizerStart(SDK, recognizer);
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            });
+			
+			speakAgainbig.addEventListener("click", function () {
+                if (!recognizer || previousSubscriptionKey != key.value) {
+                    previousSubscriptionKey = key.value;
+                    Setup();
+                }
+
+                hypothesisDiv.innerHTML = "";
+               // phraseDiv.innerHTML = "";
+                RecognizerStart(SDK, recognizer);
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+            });
+
+            stopBtn.addEventListener("click", function () {
+                RecognizerStop(SDK);
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+            });
+
+            Initialize(function (speechSdk) {
+                SDK = speechSdk;
+                startBtn.disabled = false;
+                voiceoutput("Hello! I'm your voice assistant,how can i help you ?",1)
+            });
+        });
+		
+        function voiceoutput(text,flag){
+
+            if('speechSynthesis' in window){
+
+                //var voices = speechSynthesis.getVoices();
+				//for(var i = 0; i < voices.length; i++ ) {
+				//console.log("Voice " + i.toString() + ' ' + voices[i].name + ' ' + voices[i].uri);
+				//}
+			var speech = new SpeechSynthesisUtterance(text);
+			speech.lang = 'en-US';
+			speech.voice = voices[4]
+			window.speechSynthesis.speak(speech);
+			if (flag==1)
+			{
+            setTimeout(activatestart, 4000);
+			}
+			else if (flag == 2)
+			{
+			setTimeout(voiceoutput, 10000);
+			}
+           
+			}
+        } 
+
+		
+        function activatestart()
+        {   
+          
+            $(startBtn).click() 
+            $(startBtn).hide()
+            $(stopBtn).hide()
+			$(speakAgainsmall).hide()           
+        }
+		
+        function Setup() {
+            recognizer = RecognizerSetup(SDK, SDK.RecognitionMode.Interactive, key.value);
+        }
+
+        function UpdateStatus(status) {
+            statusDiv.innerHTML = status;
+        }
+		
+		
+        function UpdateRecognizedHypothesis(text) {
+            hypothesisDiv.innerHTML = text;        
+            input = text;  
+        }
+		
+        function OnSpeechEndDetected() {
+            stopBtn.disabled = true;
+        }
+        
+        function OnComplete() {
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+       
+          
+    </script>
+    <script type="text/javascript">
+        $("#toggle-first-sidebar").click(function(){
+            $(".first-sidebar-content").toggle();
+        });
+        $("#toggle-second-sidebar").click(function(){
+            $(".second-sidebar-content").toggle();
+        });
+    </script>
+</body>
+
+<style>
+@font-face { font-family: Title; src: url('Knockout-HTF27-JuniorBantamwt.otf'); } 
+@font-face { font-family: Description; src: url('FrutigerNextPro-Light.ttf'); } 
+.bg_img
+{
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  min-width: 100%;
+  min-height: 100%;
+  z-index: -1;
+}
+.logo_deloitte
+{
+ position:absolute;
+  right:2%;
+  top:5%;
+  filter: grayscale(000%); 
+  color:#313131;
+}
+.logo_decibel
+{
+position:absolute;
+  Left:2%;
+  top:5%;
+  filter: grayscale(000%); 
+  color:#313131;
+  }
+  .sabutton
+{
+position:absolute;
+  Left:27%;
+  top:5%;
+  filter: grayscale(000%); 
+  height:60px;
+  width:60px;
+  color:#313131;
+  cursor: pointer;
+  }
+  
+    .stbutton
+{
+position:absolute;
+  Left:12%;
+  top:7%;
+  filter: grayscale(000%); 
+  color:#313131;
+  }
+  
+    .spbutton
+{
+position:absolute;
+  Left:17%;
+  top:7%;
+  filter: grayscale(000%); 
+  color:#313131;
+  }
+  
+.head{
+position:relative;
+top:1px;
+left:1px;
+font-family:Title;
+font-size:60px;
+color:#313131;
+}
+
+.head1{
+position:absolute;
+top:1.9%;
+left:15%;
+font-family:Description;
+font-size:20.5px;
+color:#313131;
+}
+
+.head2{
+position:absolute;
+top:4.85%;
+left:15%;
+font-family:Description;
+font-size:20.5px;
+color:#313131;
+}
+
+.head3{
+position:absolute;
+top:8%;
+left:15%;
+font-family:Description;
+font-size:20.5px;
+color:#313131;
+}
+
+.mic
+{
+ position:relative;
+ top:210px;
+ filter: grayscale(0%); 
+ cursor: pointer;
+}
+
+
+</style>
+</html>
